@@ -35,7 +35,6 @@ class ProgressDisplay:
 
     def start(self):
         if not self.started:
-            os.system("clear")
             self.started = True
 
     def update(
@@ -60,11 +59,6 @@ class ProgressDisplay:
         copyPercent = copyProgress * 100
         uploadPercent = uploadProgress * 100
 
-        if self.lastLines > 0:
-            print(f"\033[{self.lastLines}A", end="")
-            print("\033[2K" * self.lastLines, end="")
-            print(f"\033[{self.lastLines}A", end="")
-
         print(
             f"Copy:    [{copyBar}] {copyCurrent}/{copyTotal} ({copyPercent:.1f}%) | Errors: {copyErrors}"
         )
@@ -72,6 +66,8 @@ class ProgressDisplay:
             f"Upload:  [{uploadBar}] {uploadCurrent}/{uploadTotal} ({uploadPercent:.1f}%) | Errors: {uploadErrors}"
         )
         self.lastLines = 3
+
+        print("\r\033[3A")
 
     def finish(self):
         if self.started and self.lastLines > 0:
