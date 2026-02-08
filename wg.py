@@ -13,24 +13,24 @@ def rip():
   
   ## Count files
   print("Scanning files...", end='', flush=True)
-  total_files = 0
+  totalFiles = 0
   for filePath in root.rglob('*'):
     if filePath.is_file() and 'index' not in filePath.name.lower():
-      total_files += 1
-  print(f" Found {total_files} files")
+      totalFiles += 1
+  print(f" Found {totalFiles} files")
   
-  if total_files == 0:
+  if totalFiles == 0:
     return
   
-  print("Copying files:")
-  bar_length = 50
-  current_file = 0
+  print("Copying files...")
+  barLength = 50
+  currentFile = 0
   
   ## Copy files
   for filePath in Path(root).rglob('*'):
     if not filePath.is_file() or 'index' in filePath.name.lower():
       continue
-    current_file += 1
+    currentFile += 1
     
     modTime = datetime.fromtimestamp(os.path.getmtime(filePath))
     newName = f"{modTime.strftime('%Y%m%d_%H%M%S')}{filePath.suffix}"
@@ -47,15 +47,15 @@ def rip():
     shutil.copy2(filePath, newPath)
     
     ## Update progress bar
-    progress = current_file / total_files
-    filled_length = int(bar_length * progress)
-    bar = '█' * filled_length + '░' * (bar_length - filled_length)
+    progress = currentFile / totalFiles
+    filledLength = int(barLength * progress)
+    bar = '█' * filledLength + '░' * (barLength - filledLength)
     
-    clear_line = ' ' * 80
-    print(f"\r{clear_line}\r[{bar}] {current_file}/{total_files} ({progress*100:.1f}%)", end='', flush=True)
+    clearLine = ' ' * 80
+    print(f"\r{clearLine}\r[{bar}] {currentFile}/{totalFiles} ({progress*100:.1f}%)", end='', flush=True)
   
-  print(clear_line)
-  print(f"Copied {total_files} files to {output}")
+  print(clearLine)
+  print(f"Copied {totalFiles} files to {output}")
 
 
 def mountCd():
