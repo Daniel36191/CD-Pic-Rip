@@ -2,10 +2,11 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    # Python with tkinter
     python3
+    immich-cli
   ];
 
   shellHook = ''
+    python wg.py
   '';
 }
