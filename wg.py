@@ -12,8 +12,8 @@ import signal
 mount = "/home/daniel/mount/cdrom"
 output = "./out"
 root = Path(mount) / "Pictures"
-uploadConcurrency = 12
-copyConcurrency = 20
+uploadConcurrency = 10
+copyConcurrency = 10
 
 shouldStop = False
 
@@ -361,6 +361,9 @@ async def ripAndUpload():
     print(f"  Upload duplicates: {failedUpload}")
     print("=" * 70)
 
+    print("Checking Photos...")
+    returncode, stdout, stderr = await runCommand(f"imv {output}", ignoreErrors=True)
+
     if fileErrors:
         print(f"\nCopy errors (first 5):")
         for filePath, error in fileErrors[:5]:
@@ -388,10 +391,11 @@ async def ripAndUpload():
 
 async def mountCd():
     drive = "/dev/cdrom"
+    driveSpeed = 48
 
     os.makedirs(mount, exist_ok=True)
 
-    await runCommand("sudo eject -t", ignoreErrors=True)
+    await runCommand(f"sudo eject -t -x {driveSpeed}", ignoreErrors=True)
 
     await asyncio.sleep(1)
 
@@ -407,7 +411,7 @@ async def mountCd():
 
     if returncode == 0:
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(3)
         if os.path.ismount(mount):
             print("Successfully mounted")
             return True, "Mounted"
