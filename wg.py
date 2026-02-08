@@ -411,7 +411,7 @@ async def mountCd():
 
     if returncode == 0:
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(0.5)
         if os.path.ismount(mount):
             print("Successfully mounted")
             return True, "Mounted"
