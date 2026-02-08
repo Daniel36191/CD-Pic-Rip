@@ -501,6 +501,7 @@ async def mainLoop():
 
         await unmount()
 
+        returncode, stdout, stderr = await runCommand(f"clear")
 
 async def main():
     try:
