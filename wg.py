@@ -13,19 +13,33 @@ mount = "/home/daniel/mount/cdrom"
 output = "./out"
 subFolder = "Pictures"
 uploadConcurrency = 10
-copyConcurrency = 10
+copyConcurrency = 1
 
+debug = True
 shouldStop = False
+pathLock = asyncio.Lock()
 
 
-def signalHandler(signum, frame):
+def signalHandler():
     global shouldStop
-    print("\nCleaning up...")
+    if not shouldStop:
+        print("\nCleaning up...")
     shouldStop = True
 
 
-signal.signal(signal.SIGINT, signalHandler)
-signal.signal(signal.SIGTERM, signalHandler)
+def setupSignals():
+    loop = asyncio.get_event_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, signalHandler)
+
+
+def cleanupSignals():
+    try:
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.remove_signal_handler(sig)
+    except:
+        pass
 
 
 class ProgressDisplay:
@@ -89,6 +103,16 @@ async def runCommand(cmd, ignoreErrors=False):
         cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
 
+    while True:
+        try:
+            await asyncio.wait_for(process.wait(), timeout=0.5)
+            break
+        except asyncio.TimeoutError:
+            if shouldStop:
+                process.kill()
+                await process.wait()
+                return -1, "", "Interrupted"
+
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0 and not ignoreErrors:
@@ -130,20 +154,31 @@ async def copyAndQueueFile(
     async with semaphore:
         try:
 
-            modTime = datetime.fromtimestamp(os.path.getmtime(filePath))
+            async with pathLock:
+                modTime = datetime.fromtimestamp(os.path.getmtime(filePath))
 
-            baseName = modTime.strftime("%Y%m%d_%H%M%S")
-            suffix = filePath.suffix
-            newName = f"{baseName}{suffix}"
-            newPath = os.path.join(outputDir, newName)
-
-            counter = 1
-            while os.path.exists(newPath):
-                newName = f"{baseName}_{counter}{suffix}"
+                baseName = modTime.strftime("%Y%m%d_%H%M%S")
+                suffix = filePath.suffix
+                newName = f"{baseName}{suffix}"
                 newPath = os.path.join(outputDir, newName)
-                counter += 1
 
-            await asyncio.to_thread(shutil.copy2, filePath, newPath)
+                counter = 1
+                while os.path.exists(newPath):
+                    newName = f"{baseName}_{counter}{suffix}"
+                    newPath = os.path.join(outputDir, newName)
+                    counter += 1
+
+            srcSize = filePath.stat().st_size
+            dstSize = 0
+            for attempt in range(3):
+                await asyncio.to_thread(shutil.copy2, filePath, newPath)
+                dstSize = os.path.getsize(newPath)
+                if srcSize == dstSize:
+                    break
+                print(f"  Retry {attempt + 1} for {filePath.name} (size mismatch)")
+                await asyncio.sleep(2)
+            if srcSize != dstSize:
+                return filePath, None, f"size mismatch after 3 retries ({srcSize} vs {dstSize})"
 
             await fileQueue.put(newPath)
 
@@ -364,15 +399,12 @@ async def ripAndUpload():
     print(f"  Upload duplicates: {failedUpload}")
     print("=" * 70)
 
-    print("Checking Photos...")
-    returncode, stdout, stderr = await runCommand(f"imv {output}", ignoreErrors=True)
-
     if fileErrors:
         print(f"\nCopy errors (first 5):")
         for filePath, error in fileErrors[:5]:
             print(f"  {os.path.basename(filePath)}: {error}")
 
-    if uploaded > 0:
+    if not debug and uploaded > 0:
         print(f"\nRemoving {uploaded} uploaded files...", end="\n", flush=True)
 
         def removeUploaded():
@@ -380,7 +412,6 @@ async def ripAndUpload():
             for filePath in Path(output).glob("*"):
                 if filePath.is_file():
                     try:
-                        pass ## skip delete
                         os.unlink(filePath)
                         removed += 1
                     except:
@@ -508,6 +539,7 @@ async def mainLoop():
         returncode, stdout, stderr = await runCommand(f"clear")
 
 async def main():
+    setupSignals()
     try:
         await mainLoop()
     except Exception as e:
@@ -516,6 +548,8 @@ async def main():
 
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        cleanupSignals()
 
 
 asyncio.run(main())
