@@ -11,7 +11,7 @@ import signal
 
 mount = "/home/daniel/mount/cdrom"
 output = "./out"
-root = Path(mount) / "Pictures"
+subFolder = "Pictures"
 uploadConcurrency = 10
 copyConcurrency = 10
 
@@ -202,8 +202,15 @@ async def ripAndUpload():
 
     os.makedirs(output, exist_ok=True)
 
+    def picsPath():
+        if os.path.exists(os.path.join(mount, subFolder)):
+            return subFolder
+        else:
+            return subFolder.lower()
+    picturesPath = picsPath()
+
     print("Scanning files...", end="", flush=True)
-    fileList = await scanFiles(root)
+    fileList = await scanFiles(Path(os.path.join(mount, picturesPath)))
     totalFiles = len(fileList)
     print(f" Found {totalFiles} files")
 
@@ -373,6 +380,7 @@ async def ripAndUpload():
             for filePath in Path(output).glob("*"):
                 if filePath.is_file():
                     try:
+                        pass ## skip delete
                         os.unlink(filePath)
                         removed += 1
                     except:
