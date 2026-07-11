@@ -15,7 +15,7 @@ subFolder = "Pictures"
 uploadConcurrency = 10
 copyConcurrency = 1
 
-debug = True
+debug = False
 shouldStop = False
 pathLock = asyncio.Lock()
 
@@ -193,6 +193,7 @@ async def uploadWorker(
     uploadQueue: Queue,
     uploadSemaphore: Semaphore,
     uploadedCounter,
+    duplicateCounter,
     failedCounter,
     uploadTotalCounter,
 ):
@@ -216,7 +217,10 @@ async def uploadWorker(
                 returncode, stdout, stderr = await runCommand(cmd, ignoreErrors=True)
 
             if returncode == 0:
-                uploadedCounter["count"] += 1
+                if "0 new files" in stdout:
+                    duplicateCounter["count"] += 1
+                else:
+                    uploadedCounter["count"] += 1
             else:
                 failedCounter["count"] += 1
 
@@ -260,6 +264,7 @@ async def ripAndUpload():
 
     copiedCounter = {"count": 0}
     uploadedCounter = {"count": 0}
+    duplicateCounter = {"count": 0}
     failedUploadCounter = {"count": 0}
     failedCopyCounter = {"count": 0}
     uploadTotalCounter = {"count": 0}
@@ -274,6 +279,7 @@ async def ripAndUpload():
                 uploadQueue,
                 uploadSemaphore,
                 uploadedCounter,
+                duplicateCounter,
                 failedUploadCounter,
                 uploadTotalCounter,
             )
@@ -387,6 +393,7 @@ async def ripAndUpload():
 
     copied = copiedCounter["count"]
     uploaded = uploadedCounter["count"]
+    duplicates = duplicateCounter["count"]
     failedCopy = failedCopyCounter["count"]
     failedUpload = failedUploadCounter["count"]
 
@@ -395,8 +402,9 @@ async def ripAndUpload():
     print(f"  Files found: {totalFiles}")
     print(f"  Successfully copied: {copied}")
     print(f"  Copy errors: {failedCopy}")
-    print(f"  Successfully uploaded: {uploaded}")
-    print(f"  Upload duplicates: {failedUpload}")
+    print(f"  New uploads: {uploaded}")
+    print(f"  Duplicates skipped: {duplicates}")
+    print(f"  Upload errors: {failedUpload}")
     print("=" * 70)
 
     if fileErrors:
